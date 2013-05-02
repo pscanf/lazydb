@@ -1,3 +1,4 @@
+var START = Date.now();
 var lazydb = require("./lazydb.js");
 var fs = require("fs");
 var crypto = require("crypto");
@@ -8,12 +9,10 @@ var hash = function (buffer) {
 	return hash.digest("hex");
 };
 
+var test = {};
 var db;
 
-var test = {};
-
-test.batch_put = function (callback) {
-	var size = 10;
+test.batch_put = function (size, callback) {
 	var keys = [];
 	var values = [];
 
@@ -47,6 +46,8 @@ test.batch_put = function (callback) {
 		});
 	};
 
+	//console.log("Putting " + size + " random key/value pairs");
+
 	push_kvp(0, function (err) {
 		if (err) {
 			console.log(err);
@@ -62,64 +63,93 @@ test.batch_put = function (callback) {
 	});
 };
 
-test.verify_put = function (keys, values, callback) {
-	var size = keys.length;
-	var get_kvp = function (i, callback) {
-		if (i===size) {
-			callback(false);
+test.verify_put = function (keys, values) {
+	//console.log("Verifying...");
+	for (var i=0; i<keys.length; i++) {
+		if ( db.get(keys[i]).toString() !== values[i].toString() ) {
+			console.log("Error: value number" + i + "doesn't match!");
 			return;
 		}
-		db.get(keys[i], function (err, value) {
-			if (err) {
-				callback(err);
-				return;
-			}
-			if (value.toString()!==values[i].toString()) {
-				console.log("Error: different values");
-				console.log(i);
-				callback(true);
-				return;
-			}
-			get_kvp(i+1, callback);
-		});
-	};
-	get_kvp(0, function (err) {
-		if (err) {
-			console.log("Errors occurred");
-			callback();
-			return;
-		}
-		console.log("Everything went ok");
+	}
+	//console.log("Everything's ok");
+};
+
+test.put = function (size, callback) {
+	//console.log("");
+	//console.log("BEGIN PUT TEST");
+	var start = Date.now();
+	test.batch_put(size, function (keys, values) {
+		test.verify_put(keys, values);
+		var stop = Date.now();
+	//	console.log("END PUT TEST");
+	//	console.log("Time taken = " + (stop - start) + " ms");
 		callback();
 	});
 };
 
-test.put = function () {
-	console.log("BEGIN TEST");
-	test.batch_put(function (keys, values) {
-		test.verify_put(keys, values, function () {
-			console.log("END TEST");
-		});
-	});
+test.lsk = function () {
+	console.log("");
+	console.log("BEGIN LSK TEST");
+	var start = Date.now();
+	var keys = db.lsk();
+	var stop = Date.now();
+	console.log(keys.length);
+	console.log("END LSK TEST");
+	console.log("Time taken = " + (stop - start) + " ms");
 };
 
-test.lsk = function () {
-	db.lsk(function (err, keys) {
+test.get = function (cicles) {
+	console.log("");
+	var keys = db.lsk();
+	var key = keys[0];
+	var start = Date.now();
+	console.log("BEGIN GET TEST");
+	console.log("Getting " + cicles + " values");
+	for (var i=0; i<cicles; i++) {
+		db.get(key);
+	}
+	var stop = Date.now();
+	console.log("END GET TEST");
+	console.log("Time taken = " + (stop - start) + " ms");
+};
+
+test.open = function () {
+	console.log("");
+	console.log("BEGIN OPEN TEST");
+	var start = Date.now();
+	db = lazydb.open("./contacts");
+	var stop = Date.now();
+	console.log("END OPEN TEST");
+	console.log("Time taken = " + (stop - start) + " ms");
+};
+
+test.del = function () {
+	console.log("");
+	console.log("BEGIN DEL TEST");
+	var keys = db.lsk();
+	var logerr = function (err) {
 		if (err) {
 			console.log(err);
 		}
-		console.log(keys);
-	});
-};
-
-var init_test = function () {
-	test.lsk();
-};
-
-lazydb.open("./contacts", function (err, database) {
-	if (err) {
-		console.log(err);
+	};
+	var start = Date.now();
+	for (var i=0; i<keys.length; i++) {
+		db.del(keys[i], logerr);
 	}
-	db = database;
-	init_test();
+	var stop = Date.now();
+	console.log(keys.length);
+	console.log("END DEL TEST");
+	console.log("Time taken = " + (stop - start) + " ms");
+};
+
+var init_test = function (times) {
+	test.open();
+	//test.lsk();
+	test.del();
+};
+
+init_test(10000);
+process.on("exit", function () {
+	var STOP = Date.now();
+	console.log("Time taken = " + (STOP - START) + " ms");
 });
