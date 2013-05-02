@@ -10,84 +10,110 @@ var hash = function (buffer) {
 
 var db;
 
-var put_test = function (key, value, callback) {
-	if (!callback) {
-		callback = function () {};
-	}
-	db.put(key, value, function (err) {
-		if (err) {
-			console.log("Put error:");
-			console.log(err);
-			callback();
+var test = {};
+
+test.batch_put = function (callback) {
+	var size = 10;
+	var keys = [];
+	var values = [];
+
+	var push_kvp = function (i, callback) {
+		if (i===size) {
+			callback(false);
 			return;
 		}
-		db.get(key, function (err, val) {
+		crypto.randomBytes(512, function (err, buffer) {
 			if (err) {
-				console.log("getValue error:");
-				console.log(err);
-				callback();
+				callback("Error generating random bytes");
 				return;
 			}
-			if (val.toString()!==value) {
-				console.log("DB error: different values!!");
+			keys[i] = buffer.slice(0, 256);
+			values[i] = buffer.slice(256, 512);
+			push_kvp(i+1, callback);
+		});
+	};
+
+	var put_kvp = function (i, callback) {
+		if (i===size) {
+			callback(false);
+			return;
+		}
+		db.put(keys[i], values[i], function (err) {
+			if (err) {
+				callback(err);
+				return;
 			}
-			db.getKey(key, function (err, k) {
-				if (err) {
-					console.log("getKey error:");
-					console.log(err);
-					callback();
-					return;
-				}
-				if (k.toString()!==key) {
-					console.log("DB error: different keys!!");
-				}
-				callback();
-			});
+			put_kvp(i+1, callback);
+		});
+	};
+
+	push_kvp(0, function (err) {
+		if (err) {
+			console.log(err);
+			return;
+		}
+		put_kvp(0, function (err) {
+			if (err) {
+				console.log(err);
+				return;
+			}
+			callback(keys, values);
 		});
 	});
 };
 
-var get_keys_test = function (callback) {
-	if (!callback) {
-		callback = function () {};
-	}
-	db.getKeys(function (err, keys) {
+test.verify_put = function (keys, values, callback) {
+	var size = keys.length;
+	var get_kvp = function (i, callback) {
+		if (i===size) {
+			callback(false);
+			return;
+		}
+		db.get(keys[i], function (err, value) {
+			if (err) {
+				callback(err);
+				return;
+			}
+			if (value.toString()!==values[i].toString()) {
+				console.log("Error: different values");
+				console.log(i);
+				callback(true);
+				return;
+			}
+			get_kvp(i+1, callback);
+		});
+	};
+	get_kvp(0, function (err) {
 		if (err) {
-			console.log("getKeys error:");
-			console.log(err);
+			console.log("Errors occurred");
 			callback();
 			return;
 		}
-		console.log(keys);
+		console.log("Everything went ok");
 		callback();
 	});
 };
 
-var del_test = function (key, callback) {
-	if (!callback) {
-		callback = function () {};
-	}
-	db.del(key, function (err) {
+test.put = function () {
+	console.log("BEGIN TEST");
+	test.batch_put(function (keys, values) {
+		test.verify_put(keys, values, function () {
+			console.log("END TEST");
+		});
+	});
+};
+
+test.lsk = function () {
+	db.lsk(function (err, keys) {
 		if (err) {
-			console.log("del error:");
 			console.log(err);
-			callback();
-			return;
 		}
-		callback();
+		console.log(keys);
 	});
 };
 
 var init_test = function () {
-	put_test("1", "1", function () {
-		put_test("2", "2", function () {
-			get_keys_test(function () {
-				del_test("2", function() {
-					get_keys_test();
-				});
-			});
-		});
-	});
+	test.lsk();
 };
 
 lazydb.open("./contacts", function (err, database) {
