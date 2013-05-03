@@ -1,7 +1,7 @@
 /* Required modules */
 var fs = require("fs");
 var crypto = require("crypto");
-var error = require("./error.js");
+var error = require("../error");
 
 /* Utility function(s) */
 var hash = function (buffer) {
