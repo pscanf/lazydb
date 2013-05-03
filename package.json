@@ -1,0 +1,4 @@
+{
+	"name" : "lazydb",
+	"main" : "./lazydb.js"
+}
