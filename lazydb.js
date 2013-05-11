@@ -143,7 +143,7 @@ var init_db = function (dir) {
 	lazydb.iterate = function (action) {
 		for (var kvp in db) {
 			if (db.hasOwnProperty(kvp)) {
-				action(kvp);
+				action(db[kvp]);
 			}
 		}
 	};
